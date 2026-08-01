@@ -109,7 +109,7 @@ export function StrategyBoard() {
         onModeChange={setMode}
       />
 
-      <main className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
+      <main className="relative h-full min-h-0 min-w-0 flex-1 overflow-hidden">
         {mode === "2d" ? (
           <Board2D
             rocks={rocks}
@@ -123,7 +123,7 @@ export function StrategyBoard() {
             neonRing={options.neonRing}
           />
         ) : (
-          <>
+          <div className="relative h-full w-full">
             <Board3D
               rocks={rocks}
               markers={markers}
@@ -136,7 +136,7 @@ export function StrategyBoard() {
             <p className="pointer-events-none absolute bottom-3 left-1/2 z-10 -translate-x-1/2 text-sport-sm text-[14px] text-muted-foreground">
               Drag to orbit · Right-drag to pan · Scroll to zoom
             </p>
-          </>
+          </div>
         )}
       </main>
     </div>

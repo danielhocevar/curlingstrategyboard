@@ -1,12 +1,12 @@
 import {
   HOG_LINE_Y,
-  HOUSE_RADIUS,
+  HOUSE_FRONT_Y,
   SIDE_LINE,
 } from "@/lib/rink";
 
 /** Front of house (12-ft edge toward hog) → hog line. */
-const ZONE_START_Y = HOUSE_RADIUS;
-const ZONE_END_Y = HOG_LINE_Y;
+const ZONE_HOUSE_Y = HOUSE_FRONT_Y;
+const ZONE_HOG_Y = HOG_LINE_Y;
 const ZONE_COUNT = 3;
 
 const FILLS = [
@@ -16,14 +16,14 @@ const FILLS = [
 ] as const;
 
 export function GuardZones() {
-  const span = ZONE_END_Y - ZONE_START_Y;
+  const span = ZONE_HOUSE_Y - ZONE_HOG_Y;
   const band = span / ZONE_COUNT;
 
   return (
     <g aria-hidden="true" style={{ pointerEvents: "none" }}>
       {Array.from({ length: ZONE_COUNT }, (_, i) => {
         // Zone 1 is furthest from the house (closest to the hog).
-        const y = ZONE_END_Y - (i + 1) * band;
+        const y = ZONE_HOG_Y + i * band;
         const midY = y + band / 2;
         const label = i + 1;
 
@@ -61,9 +61,9 @@ export function GuardZones() {
       })}
       <line
         x1={-SIDE_LINE}
-        y1={ZONE_END_Y}
+        y1={ZONE_HOUSE_Y}
         x2={SIDE_LINE}
-        y2={ZONE_END_Y}
+        y2={ZONE_HOUSE_Y}
         stroke="rgba(26,34,44,0.08)"
         strokeWidth={0.03}
       />

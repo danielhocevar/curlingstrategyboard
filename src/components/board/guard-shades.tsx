@@ -21,14 +21,16 @@ export function GuardShades({ rocks }: GuardShadesProps) {
   return (
     <g aria-hidden="true" style={{ pointerEvents: "none" }}>
       {guards.map((rock) => {
-        const height = rock.y - BACK_LINE_Y;
+        const y1 = Math.min(rock.y, BACK_LINE_Y);
+        const y2 = Math.max(rock.y, BACK_LINE_Y);
+        const height = y2 - y1;
         if (height <= 0) return null;
 
         return (
           <rect
             key={`shade-${rock.id}`}
             x={rock.x - STONE_RADIUS}
-            y={BACK_LINE_Y}
+            y={y1}
             width={STONE_DIAMETER}
             height={height}
             fill={SHADE[rock.team]}

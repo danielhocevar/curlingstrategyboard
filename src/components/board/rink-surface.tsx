@@ -85,7 +85,7 @@ export function RinkSurface() {
       {/* Side racks (rocks + marker palette) */}
       <rect
         x={VIEW_MIN_X + 0.15}
-        y={-1.6}
+        y={-10.6}
         width={2.1}
         height={8 * 1.25 + 2.2}
         rx={0.08}
@@ -95,7 +95,7 @@ export function RinkSurface() {
       />
       <rect
         x={SIDE_LINE + 0.35}
-        y={-1.6}
+        y={-10.6}
         width={2.1}
         height={8 * 1.25 + 2.2}
         rx={0.08}
@@ -213,7 +213,7 @@ export function RinkSurface() {
       {/* Line labels */}
       <text
         x={-SIDE_LINE + 0.2}
-        y={HOG_LINE_Y - 0.28}
+        y={HOG_LINE_Y + 0.48}
         fill="rgba(26,34,44,0.45)"
         fontSize={0.42}
         fontFamily="var(--font-display), var(--font-barlow-condensed), sans-serif"
@@ -237,7 +237,7 @@ export function RinkSurface() {
       </text>
       <text
         x={-SIDE_LINE + 0.2}
-        y={BACK_LINE_Y - 0.22}
+        y={BACK_LINE_Y + 0.42}
         fill="rgba(26,34,44,0.4)"
         fontSize={0.36}
         fontFamily="var(--font-display), var(--font-barlow-condensed), sans-serif"

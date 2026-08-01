@@ -9,7 +9,7 @@ export const BUTTON_RADIUS = 0.5;
 export const STONE_DIAMETER = 11.5 / 12; // 11.5 in
 export const STONE_RADIUS = STONE_DIAMETER / 2;
 
-/** Extra ice shown past the back line and below the hog line. */
+/** Extra ice shown past the back line and past the hog line. */
 export const BACK_MARGIN = 2.25;
 export const HOG_MARGIN = 1.75;
 
@@ -19,19 +19,24 @@ export const RACK_GUTTER = 2.6;
 export const VIEW_WIDTH = SHEET_WIDTH + RACK_GUTTER * 2;
 export const VIEW_HEIGHT = BACK_MARGIN + HOUSE_RADIUS + HOG_TO_TEE + HOG_MARGIN;
 
-/** Tee / button at (0, 0). +y toward hog line (down the screen). */
+/**
+ * Tee / button at (0, 0).
+ * +y toward the back line (down the screen); -y toward the hog (up the screen).
+ */
 export const VIEW_MIN_X = -VIEW_WIDTH / 2;
 export const VIEW_MAX_X = VIEW_WIDTH / 2;
-export const VIEW_MIN_Y = -(HOUSE_RADIUS + BACK_MARGIN);
-export const VIEW_MAX_Y = HOG_TO_TEE + HOG_MARGIN;
+export const VIEW_MIN_Y = -(HOG_TO_TEE + HOG_MARGIN);
+export const VIEW_MAX_Y = HOUSE_RADIUS + BACK_MARGIN;
 
-export const BACK_LINE_Y = -HOUSE_RADIUS;
+export const HOG_LINE_Y = -HOG_TO_TEE;
 export const TEE_LINE_Y = 0;
-export const HOG_LINE_Y = HOG_TO_TEE;
+export const BACK_LINE_Y = HOUSE_RADIUS;
+/** 12-ft ring edge facing the hog. */
+export const HOUSE_FRONT_Y = -HOUSE_RADIUS;
 export const SIDE_LINE = SHEET_WIDTH / 2;
 
 /** Center of sheet, halfway between house front and hog line. */
-export const LOGO_Y = (HOUSE_RADIUS + HOG_LINE_Y) / 2;
+export const LOGO_Y = (HOUSE_FRONT_Y + HOG_LINE_Y) / 2;
 export const LOGO_SIZE = 5.2;
 export const LOGO_CAPTION = "teamhocevar";
 
@@ -57,15 +62,16 @@ export const MARKER_RADIUS = STONE_RADIUS;
 
 export function rackPosition(team: Team, number: number): { x: number; y: number } {
   const col = team === "red" ? -(SIDE_LINE + RACK_GUTTER * 0.55) : SIDE_LINE + RACK_GUTTER * 0.55;
-  const startY = -1.2;
+  const startY = 1.2;
   const gap = STONE_DIAMETER + 0.28;
-  return { x: col, y: startY + (number - 1) * gap };
+  // 1 at the top (toward hog), 8 at the bottom (toward house).
+  return { x: col, y: startY - (8 - number) * gap };
 }
 
-/** Infinite source for team markers, below the rock rack. */
+/** Infinite source for team markers, past rock 1 toward the hog. */
 export function markerPalettePosition(team: Team): { x: number; y: number } {
-  const rock8 = rackPosition(team, 8);
-  return { x: rock8.x, y: rock8.y + STONE_DIAMETER + 0.7 };
+  const rock1 = rackPosition(team, 1);
+  return { x: rock1.x, y: rock1.y - STONE_DIAMETER - 0.7 };
 }
 
 /** 0 → A, 25 → Z, 26 → AA */
@@ -153,7 +159,7 @@ export function formatFeet(value: number): string {
 export function isGuard(rock: Rock): boolean {
   return (
     Math.abs(rock.x) <= SIDE_LINE &&
-    rock.y > HOUSE_RADIUS &&
-    rock.y < HOG_LINE_Y
+    rock.y < HOUSE_FRONT_Y &&
+    rock.y > HOG_LINE_Y
   );
 }

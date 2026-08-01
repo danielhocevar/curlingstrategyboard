@@ -1,20 +1,21 @@
 "use client";
 
-import { Suspense, useMemo } from "react";
-import { Canvas } from "@react-three/fiber";
 import {
-  ContactShadows,
-  Environment,
-  OrbitControls,
-  Text,
-  useTexture,
-} from "@react-three/drei";
+  Suspense,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { Canvas, useThree } from "@react-three/fiber";
+import { ContactShadows, OrbitControls, Text } from "@react-three/drei";
 import * as THREE from "three";
 import {
   BACK_LINE_Y,
   BUTTON_RADIUS,
   HOG_LINE_Y,
-  HOG_TO_TEE,
+  HOUSE_FRONT_Y,
   HOUSE_RADIUS,
   isGuard,
   LOGO_CAPTION,
@@ -28,6 +29,7 @@ import {
   TEE_LINE_Y,
   MARKER_RADIUS,
   VIEW_HEIGHT,
+  VIEW_MAX_Y,
   VIEW_MIN_Y,
   VIEW_WIDTH,
   type Marker,
@@ -57,8 +59,8 @@ const LANE_COLOR = {
 
 const ZONE_FILLS = ["#c8d4e4", "#b9c7db", "#c2d0e2"] as const;
 const ZONE_COUNT = 3;
-const ZONE_START_Y = HOUSE_RADIUS;
-const ZONE_END_Y = HOG_LINE_Y;
+const ZONE_HOUSE_Y = HOUSE_FRONT_Y;
+const ZONE_HOG_Y = HOG_LINE_Y;
 
 const NEON = {
   outer: "#00c853",
@@ -124,13 +126,13 @@ function LineMark({
 }
 
 function GuardZones3D() {
-  const span = ZONE_END_Y - ZONE_START_Y;
+  const span = ZONE_HOUSE_Y - ZONE_HOG_Y;
   const band = span / ZONE_COUNT;
 
   return (
     <group>
       {Array.from({ length: ZONE_COUNT }, (_, i) => {
-        const z = ZONE_END_Y - (i + 1) * band + band / 2;
+        const z = ZONE_HOG_Y + i * band + band / 2;
         const label = i + 1;
         return (
           <group key={`zone3d-${label}`}>
@@ -170,9 +172,11 @@ function GuardLanes3D({ rocks }: { rocks: Rock[] }) {
   return (
     <group>
       {rocks.filter(isGuard).map((rock) => {
-        const length = rock.y - BACK_LINE_Y;
+        const z1 = Math.min(rock.y, BACK_LINE_Y);
+        const z2 = Math.max(rock.y, BACK_LINE_Y);
+        const length = z2 - z1;
         if (length <= 0) return null;
-        const cz = BACK_LINE_Y + length / 2;
+        const cz = (z1 + z2) / 2;
         return (
           <mesh
             key={`lane3d-${rock.id}`}
@@ -225,43 +229,139 @@ function useInstagramIconTexture() {
   }, []);
 }
 
-function ThLogo3D() {
-  const texture = useTexture("/th_logo.svg");
-  texture.colorSpace = THREE.SRGBColorSpace;
-  const igTexture = useInstagramIconTexture();
+/** Rasterize an SVG onto a canvas texture without Suspense. */
+function useImageTexture(url: string, size = 512) {
+  const [texture, setTexture] = useState<THREE.CanvasTexture | null>(null);
 
-  const captionGap = 0.32;
-  const captionSize = 0.75;
-  const iconSize = 0.75;
-  const blockHeight = LOGO_SIZE + captionGap + captionSize;
-  const logoZ = LOGO_Y - blockHeight / 2 + LOGO_SIZE / 2;
-  const captionZ = LOGO_Y - blockHeight / 2 + LOGO_SIZE + captionGap + captionSize / 2;
-  const captionWidth = iconSize + 0.18 + LOGO_CAPTION.length * captionSize * 0.48;
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl: string | null = null;
+
+    const paint = (img: HTMLImageElement) => {
+      if (cancelled) return;
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.clearRect(0, 0, size, size);
+        ctx.drawImage(img, 0, 0, size, size);
+      }
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = 4;
+      tex.needsUpdate = true;
+      setTexture(tex);
+    };
+
+    void (async () => {
+      try {
+        const res = await fetch(url);
+        let svg = await res.text();
+        // width/height 100% often yields a 0×0 bitmap; force pixel size.
+        svg = svg.replace(/<svg\b([^>]*)>/i, (_match, attrs: string) => {
+          const cleaned = attrs
+            .replace(/\swidth="[^"]*"/gi, "")
+            .replace(/\sheight="[^"]*"/gi, "");
+          return `<svg${cleaned} width="${size}" height="${size}">`;
+        });
+        objectUrl = URL.createObjectURL(
+          new Blob([svg], { type: "image/svg+xml" }),
+        );
+        const img = new Image();
+        img.onload = () => paint(img);
+        img.src = objectUrl;
+      } catch {
+        const img = new Image();
+        img.onload = () => paint(img);
+        img.src = url;
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      setTexture((prev) => {
+        prev?.dispose();
+        return null;
+      });
+    };
+  }, [url, size]);
+
+  return texture;
+}
+
+function useCaptionTexture(text: string) {
+  return useMemo(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 512;
+    canvas.height = 128;
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#1a222c";
+      ctx.font = "italic 800 72px system-ui, sans-serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, 8, canvas.height / 2);
+    }
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.needsUpdate = true;
+    return tex;
+  }, [text]);
+}
+
+function ThLogo3D() {
+  const texture = useImageTexture("/th_logo.svg", 512);
+  const igTexture = useInstagramIconTexture();
+  const captionTexture = useCaptionTexture(LOGO_CAPTION);
+
+  // Slightly smaller than 2D so the full mark + caption fit in the default frame.
+  const logoSize = LOGO_SIZE * 0.78;
+  const captionGap = 0.3;
+  const captionSize = 0.7;
+  const iconSize = 0.68;
+  const iconTextGap = 0.14;
+  const textWidth = LOGO_CAPTION.length * captionSize * 0.52;
+  const captionWidth = iconSize + iconTextGap + textWidth;
+  const blockHeight = logoSize + captionGap + captionSize;
+  // House-end camera (matches 2D): hog up-screen, house down-screen.
+  // Logo toward hog, IG row below toward house.
+  const blockCenterZ = LOGO_Y;
+  const logoZ = blockCenterZ - blockHeight / 2 + logoSize / 2;
+  const captionZ = blockCenterZ + blockHeight / 2 - captionSize / 2;
   const iconX = -captionWidth / 2 + iconSize / 2;
-  const textX = iconX + iconSize / 2 + 0.18;
+  const textX = -captionWidth / 2 + iconSize + iconTextGap + textWidth / 2;
+
+  // Readable from behind the house looking toward the hog.
+  const brandRot: [number, number, number] = [-Math.PI / 2, 0, 0];
+
+  if (!texture) return null;
 
   return (
     <group>
       <mesh
-        rotation={[-Math.PI / 2, 0, 0]}
+        rotation={brandRot}
         position={[0, BRAND_Y, logoZ]}
         renderOrder={4}
       >
-        <planeGeometry args={[LOGO_SIZE, LOGO_SIZE]} />
+        <planeGeometry args={[logoSize, logoSize]} />
         <meshBasicMaterial
           map={texture}
           transparent
-          opacity={0.22}
+          opacity={0.3}
           depthWrite={false}
           depthTest
           toneMapped={false}
+          side={THREE.DoubleSide}
           polygonOffset
           polygonOffsetFactor={-6}
           polygonOffsetUnits={-6}
         />
       </mesh>
       <mesh
-        rotation={[-Math.PI / 2, 0, 0]}
+        rotation={brandRot}
         position={[iconX, BRAND_Y, captionZ]}
         renderOrder={4}
       >
@@ -269,26 +369,33 @@ function ThLogo3D() {
         <meshBasicMaterial
           map={igTexture}
           transparent
-          opacity={0.32}
+          opacity={0.42}
           depthWrite={false}
           toneMapped={false}
+          side={THREE.DoubleSide}
           polygonOffset
           polygonOffsetFactor={-6}
           polygonOffsetUnits={-6}
         />
       </mesh>
-      <Text
+      <mesh
+        rotation={brandRot}
         position={[textX, BRAND_Y, captionZ]}
-        rotation={[-Math.PI / 2, 0, 0]}
-        fontSize={captionSize}
-        color="#1a222c"
-        fillOpacity={0.32}
-        anchorX="left"
-        anchorY="middle"
         renderOrder={4}
       >
-        {LOGO_CAPTION}
-      </Text>
+        <planeGeometry args={[textWidth, captionSize]} />
+        <meshBasicMaterial
+          map={captionTexture}
+          transparent
+          opacity={0.42}
+          depthWrite={false}
+          toneMapped={false}
+          side={THREE.DoubleSide}
+          polygonOffset
+          polygonOffsetFactor={-6}
+          polygonOffsetUnits={-6}
+        />
+      </mesh>
     </group>
   );
 }
@@ -395,9 +502,7 @@ function Rink3D() {
         width={0.05}
       />
 
-      <Suspense fallback={null}>
-        <ThLogo3D />
-      </Suspense>
+      <ThLogo3D />
     </group>
   );
 }
@@ -633,6 +738,39 @@ type Board3DProps = {
   neonRing?: boolean;
 };
 
+const sheetCenterZ = VIEW_MIN_Y + VIEW_HEIGHT / 2;
+/** Behind the house, looking toward the hog (same reading direction as 2D). */
+const orbitTarget: [number, number, number] = [0, 0, 0];
+const cameraPosition: [number, number, number] = [0, 20, VIEW_MAX_Y + 12];
+
+/** react-use-measure can drop the first RO callback before its mounted flag flips. */
+function ForceCanvasSize({
+  width,
+  height,
+}: {
+  width: number;
+  height: number;
+}) {
+  const setSize = useThree((s) => s.setSize);
+  const gl = useThree((s) => s.gl);
+  const camera = useThree((s) => s.camera);
+
+  useLayoutEffect(() => {
+    if (width <= 1 || height <= 1) return;
+    setSize(width, height);
+    gl.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+    gl.setSize(width, height, false);
+    gl.domElement.style.width = `${width}px`;
+    gl.domElement.style.height = `${height}px`;
+    if ("aspect" in camera) {
+      (camera as THREE.PerspectiveCamera).aspect = width / height;
+      camera.updateProjectionMatrix();
+    }
+  }, [width, height, setSize, gl, camera]);
+
+  return null;
+}
+
 export function Board3D({
   rocks,
   markers,
@@ -642,108 +780,192 @@ export function Board3D({
   showGuardZones = false,
   neonRing = false,
 }: Board3DProps) {
-  const lookAtZ = HOG_TO_TEE * 0.4;
-  const sheetCenterZ = VIEW_MIN_Y + VIEW_HEIGHT / 2;
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [viewport, setViewport] = useState({ width: 0, height: 0 });
+
+  useLayoutEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const update = () => {
+      const width = el.clientWidth;
+      const height = el.clientHeight;
+      if (width <= 1 || height <= 1) return;
+      setViewport((prev) =>
+        prev.width === width && prev.height === height
+          ? prev
+          : { width, height },
+      );
+    };
+
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const ready = viewport.width > 1 && viewport.height > 1;
+
+  // Kick R3F's useMeasure after mount — it can miss the first ResizeObserver pass.
+  useLayoutEffect(() => {
+    if (!ready) return;
+    const id = window.setTimeout(() => {
+      window.dispatchEvent(new Event("resize"));
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [ready, viewport.width, viewport.height]);
 
   return (
-    <div className="absolute inset-0" style={{ background: "#cbd5e1" }}>
-      <Canvas
-        shadows
-        dpr={[1, 2]}
-        camera={{
-          position: [8, 18, 28],
-          fov: 40,
-          near: 0.1,
-          far: 200,
-        }}
-        gl={{
-          antialias: true,
-          alpha: false,
-          powerPreference: "high-performance",
-          toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 1.05,
-          logarithmicDepthBuffer: true,
-        }}
-        style={{ width: "100%", height: "100%", display: "block" }}
-        onCreated={({ gl, scene, camera }) => {
-          gl.setClearColor("#cbd5e1", 1);
-          scene.background = new THREE.Color("#cbd5e1");
-          camera.lookAt(0, 0, lookAtZ);
-        }}
-        onPointerMissed={() => onSelect(null)}
-      >
-        <color attach="background" args={["#cbd5e1"]} />
-        <fog attach="fog" args={["#cbd5e1", 45, 95]} />
-
-        <ambientLight intensity={0.4} />
-        <hemisphereLight args={["#ffffff", "#64748b", 0.55]} />
-        <directionalLight
-          position={[16, 30, 12]}
-          intensity={1.55}
-          castShadow
-          shadow-mapSize={[2048, 2048]}
-          shadow-bias={-0.0002}
-          shadow-normalBias={0.02}
-          shadow-camera-near={1}
-          shadow-camera-far={90}
-          shadow-camera-left={-22}
-          shadow-camera-right={22}
-          shadow-camera-top={30}
-          shadow-camera-bottom={-20}
-        />
-        <directionalLight position={[-12, 10, -8]} intensity={0.35} color="#bfdbfe" />
-        <directionalLight position={[0, 8, 24]} intensity={0.3} color="#fff7ed" />
-
-        <Environment preset="city" environmentIntensity={0.45} />
-
-        <Rink3D />
-        {showGuardZones ? <GuardZones3D /> : null}
-        {showGuardShades ? <GuardLanes3D rocks={rocks} /> : null}
-        {markers.map((marker) => (
-          <Marker3D
-            key={marker.id}
-            marker={marker}
-            selected={marker.id === selectedId}
-            onSelect={onSelect}
+    <div
+      ref={containerRef}
+      className="relative h-full w-full"
+      style={{ background: "#cbd5e1" }}
+    >
+      {ready ? (
+        <Canvas
+          key={`${viewport.width}x${viewport.height}`}
+          shadows
+          dpr={[1, 1.75]}
+          resize={{ debounce: 0, scroll: false, offsetSize: true }}
+          camera={{
+            position: cameraPosition,
+            fov: 40,
+            near: 0.1,
+            far: 400,
+          }}
+          gl={{
+            antialias: true,
+            alpha: false,
+            powerPreference: "high-performance",
+            toneMapping: THREE.ACESFilmicToneMapping,
+            toneMappingExposure: 1.35,
+          }}
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            display: "block",
+            background: "#cbd5e1",
+          }}
+          onCreated={({ gl, scene, camera }) => {
+            gl.setClearColor("#cbd5e1", 1);
+            scene.background = new THREE.Color("#cbd5e1");
+            camera.lookAt(...orbitTarget);
+          }}
+          onPointerMissed={() => onSelect(null)}
+        >
+          <ForceCanvasSize
+            width={viewport.width}
+            height={viewport.height}
           />
-        ))}
-        {rocks.map((rock) => (
-          <NumberedRock
-            key={rock.id}
-            rock={rock}
-            selected={rock.id === selectedId}
-            neonRing={neonRing}
-            onSelect={onSelect}
+          <color attach="background" args={["#cbd5e1"]} />
+
+          {/* Soft wrap lighting from every side — keep key gentle so fills win. */}
+          <ambientLight intensity={1.25} />
+          <hemisphereLight args={["#ffffff", "#d7dee8", 1.2]} />
+          <directionalLight
+            position={[4, 40, sheetCenterZ]}
+            intensity={0.55}
+            castShadow
+            shadow-mapSize={[1024, 1024]}
+            shadow-bias={-0.0002}
+            shadow-normalBias={0.03}
+            shadow-camera-near={1}
+            shadow-camera-far={100}
+            shadow-camera-left={-24}
+            shadow-camera-right={24}
+            shadow-camera-top={30}
+            shadow-camera-bottom={-24}
           />
-        ))}
+          <directionalLight
+            position={[0, 22, VIEW_MAX_Y + 16]}
+            intensity={0.95}
+            color="#ffffff"
+          />
+          <directionalLight
+            position={[0, 18, VIEW_MIN_Y - 12]}
+            intensity={0.9}
+            color="#fffaf0"
+          />
+          <directionalLight
+            position={[24, 16, sheetCenterZ]}
+            intensity={0.8}
+            color="#eef4ff"
+          />
+          <directionalLight
+            position={[-24, 16, sheetCenterZ]}
+            intensity={0.8}
+            color="#fff6eb"
+          />
+          <directionalLight
+            position={[12, 10, sheetCenterZ + 18]}
+            intensity={0.55}
+          />
+          <directionalLight
+            position={[-12, 10, sheetCenterZ - 18]}
+            intensity={0.55}
+          />
+          <pointLight
+            position={[0, 10, sheetCenterZ]}
+            intensity={0.65}
+            distance={80}
+            decay={1.2}
+          />
 
-        <ContactShadows
-          position={[0, SHADOW_Y, sheetCenterZ]}
-          opacity={0.35}
-          scale={VIEW_WIDTH + 8}
-          blur={2.2}
-          far={12}
-          resolution={512}
-          frames={1}
-          color="#0f172a"
-        />
+          <Rink3D />
+          {showGuardZones ? (
+            <Suspense fallback={null}>
+              <GuardZones3D />
+            </Suspense>
+          ) : null}
+          {showGuardShades ? <GuardLanes3D rocks={rocks} /> : null}
+          {markers.map((marker) => (
+            <Marker3D
+              key={marker.id}
+              marker={marker}
+              selected={marker.id === selectedId}
+              onSelect={onSelect}
+            />
+          ))}
+          {rocks.map((rock) => (
+            <NumberedRock
+              key={rock.id}
+              rock={rock}
+              selected={rock.id === selectedId}
+              neonRing={neonRing}
+              onSelect={onSelect}
+            />
+          ))}
 
-        <OrbitControls
-          makeDefault
-          target={[0, 0, lookAtZ]}
-          enablePan
-          enableRotate
-          enableZoom
-          panSpeed={0.9}
-          rotateSpeed={0.65}
-          zoomSpeed={0.8}
-          minDistance={6}
-          maxDistance={70}
-          maxPolarAngle={Math.PI / 2.08}
-          minPolarAngle={0.12}
-          screenSpacePanning
-        />
-      </Canvas>
+          <ContactShadows
+            position={[0, SHADOW_Y, sheetCenterZ]}
+            opacity={0.22}
+            scale={VIEW_WIDTH + 8}
+            blur={2.6}
+            far={12}
+            resolution={512}
+            frames={1}
+            color="#0f172a"
+          />
+
+          <OrbitControls
+            makeDefault
+            target={orbitTarget}
+            enablePan
+            enableRotate
+            enableZoom
+            panSpeed={0.9}
+            rotateSpeed={0.65}
+            zoomSpeed={0.8}
+            minDistance={8}
+            maxDistance={90}
+            maxPolarAngle={Math.PI / 2.05}
+            minPolarAngle={0.15}
+            screenSpacePanning
+          />
+        </Canvas>
+      ) : null}
     </div>
   );
 }
