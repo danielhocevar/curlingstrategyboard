@@ -3,6 +3,9 @@ import {
   BUTTON_RADIUS,
   HOG_LINE_Y,
   HOUSE_RADIUS,
+  LOGO_CAPTION,
+  LOGO_SIZE,
+  LOGO_Y,
   RING_4_RADIUS,
   RING_8_RADIUS,
   SIDE_LINE,
@@ -15,6 +18,18 @@ import {
 } from "@/lib/rink";
 
 export function RinkSurface() {
+  const captionSize = 0.72;
+  const captionGap = 0.28;
+  const iconSize = 0.7;
+  const iconTextGap = 0.14;
+  const captionWidth =
+    iconSize + iconTextGap + LOGO_CAPTION.length * captionSize * 0.52;
+  const blockHeight = LOGO_SIZE + captionGap + captionSize;
+  const blockTop = LOGO_Y - blockHeight / 2;
+  const captionY = blockTop + LOGO_SIZE + captionGap + captionSize * 0.78;
+  const captionLeft = -captionWidth / 2;
+  const brandFill = "rgba(26,34,44,0.28)";
+
   return (
     <g aria-hidden="true">
       <defs>
@@ -147,14 +162,64 @@ export function RinkSurface() {
         strokeWidth={0.04}
       />
 
+      {/* Team Hocevar logo — mid guard zone */}
+      <g style={{ pointerEvents: "none" }}>
+        <image
+          href="/th_logo.svg"
+          x={-LOGO_SIZE / 2}
+          y={blockTop}
+          width={LOGO_SIZE}
+          height={LOGO_SIZE}
+          opacity={0.2}
+        />
+        <g transform={`translate(${captionLeft}, ${captionY - iconSize})`}>
+          <g transform={`scale(${iconSize / 24})`}>
+            <rect
+              x={2}
+              y={2}
+              width={20}
+              height={20}
+              rx={5}
+              ry={5}
+              fill="none"
+              stroke={brandFill}
+              strokeWidth={1.8}
+            />
+            <circle
+              cx={12}
+              cy={12}
+              r={4.2}
+              fill="none"
+              stroke={brandFill}
+              strokeWidth={1.8}
+            />
+            <circle cx={17.5} cy={6.5} r={1.2} fill={brandFill} />
+          </g>
+          <text
+            x={iconSize + iconTextGap}
+            y={iconSize * 0.82}
+            fill={brandFill}
+            fontSize={captionSize}
+            fontFamily="var(--font-display), var(--font-barlow-condensed), sans-serif"
+            fontWeight={800}
+            fontStyle="italic"
+            letterSpacing={0.04}
+          >
+            {LOGO_CAPTION}
+          </text>
+        </g>
+      </g>
+
       {/* Line labels */}
       <text
         x={-SIDE_LINE + 0.2}
         y={HOG_LINE_Y - 0.28}
         fill="rgba(26,34,44,0.45)"
-        fontSize={0.38}
-        fontFamily="var(--font-mono), ui-monospace, monospace"
-        letterSpacing={0.04}
+        fontSize={0.42}
+        fontFamily="var(--font-display), var(--font-barlow-condensed), sans-serif"
+        fontWeight={900}
+        fontStyle="italic"
+        letterSpacing={0.06}
       >
         HOG
       </text>
@@ -162,9 +227,11 @@ export function RinkSurface() {
         x={-SIDE_LINE + 0.2}
         y={TEE_LINE_Y - 0.22}
         fill="rgba(26,34,44,0.4)"
-        fontSize={0.32}
-        fontFamily="var(--font-mono), ui-monospace, monospace"
-        letterSpacing={0.04}
+        fontSize={0.36}
+        fontFamily="var(--font-display), var(--font-barlow-condensed), sans-serif"
+        fontWeight={900}
+        fontStyle="italic"
+        letterSpacing={0.06}
       >
         TEE
       </text>
@@ -172,9 +239,11 @@ export function RinkSurface() {
         x={-SIDE_LINE + 0.2}
         y={BACK_LINE_Y - 0.22}
         fill="rgba(26,34,44,0.4)"
-        fontSize={0.32}
-        fontFamily="var(--font-mono), ui-monospace, monospace"
-        letterSpacing={0.04}
+        fontSize={0.36}
+        fontFamily="var(--font-display), var(--font-barlow-condensed), sans-serif"
+        fontWeight={900}
+        fontStyle="italic"
+        letterSpacing={0.06}
       >
         BACK
       </text>

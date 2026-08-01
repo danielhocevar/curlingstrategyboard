@@ -30,6 +30,11 @@ export const TEE_LINE_Y = 0;
 export const HOG_LINE_Y = HOG_TO_TEE;
 export const SIDE_LINE = SHEET_WIDTH / 2;
 
+/** Center of sheet, halfway between house front and hog line. */
+export const LOGO_Y = (HOUSE_RADIUS + HOG_LINE_Y) / 2;
+export const LOGO_SIZE = 5.2;
+export const LOGO_CAPTION = "teamhocevar";
+
 export type Team = "red" | "yellow";
 
 export type Rock = {

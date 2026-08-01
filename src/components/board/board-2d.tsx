@@ -11,6 +11,7 @@ import {
   VIEW_WIDTH,
 } from "@/lib/rink";
 import { GuardShades } from "@/components/board/guard-shades";
+import { GuardZones } from "@/components/board/guard-zones";
 import { RinkSurface } from "@/components/board/rink-surface";
 import { Rock as RockPiece, RockDefs } from "@/components/board/rock";
 
@@ -38,18 +39,23 @@ function clientToSvg(
 type Board2DProps = {
   rocks: Rock[];
   onRocksChange: (rocks: Rock[] | ((prev: Rock[]) => Rock[])) => void;
+  selectedId: string | null;
+  onSelect: (id: string | null) => void;
   showGuardShades?: boolean;
+  showGuardZones?: boolean;
   neonRing?: boolean;
 };
 
 export function Board2D({
   rocks,
   onRocksChange,
+  selectedId,
+  onSelect,
   showGuardShades = false,
+  showGuardZones = false,
   neonRing = false,
 }: Board2DProps) {
   const svgRef = useRef<SVGSVGElement>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
 
   const returnToRack = useCallback(
@@ -73,7 +79,7 @@ export function Board2D({
       if (!svg) return;
 
       const point = clientToSvg(svg, event.clientX, event.clientY);
-      setSelectedId(rock.id);
+      onSelect(rock.id);
       setDrag({
         id: rock.id,
         pointerId: event.pointerId,
@@ -81,7 +87,7 @@ export function Board2D({
         offsetY: rock.y - point.y,
       });
     },
-    [],
+    [onSelect],
   );
 
   useEffect(() => {
@@ -123,7 +129,7 @@ export function Board2D({
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        setSelectedId(null);
+        onSelect(null);
         return;
       }
       if (
@@ -136,7 +142,7 @@ export function Board2D({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [returnToRack, selectedId]);
+  }, [onSelect, returnToRack, selectedId]);
 
   return (
     <div className="flex h-full w-full items-center justify-center p-3 sm:p-5 lg:p-8">
@@ -149,10 +155,11 @@ export function Board2D({
         preserveAspectRatio="xMidYMid meet"
         role="application"
         aria-label="Curling strategy board 2D"
-        onPointerDown={() => setSelectedId(null)}
+        onPointerDown={() => onSelect(null)}
       >
         <RockDefs />
         <RinkSurface />
+        {showGuardZones ? <GuardZones /> : null}
         {showGuardShades ? <GuardShades rocks={rocks} /> : null}
         {[...rocks]
           .sort((a, b) => {
