@@ -82,12 +82,12 @@ export function RinkSurface() {
         opacity={0.55}
       />
 
-      {/* Side racks (staging pads) */}
+      {/* Side racks (rocks + marker palette) */}
       <rect
         x={VIEW_MIN_X + 0.15}
         y={-1.6}
         width={2.1}
-        height={8 * 1.25}
+        height={8 * 1.25 + 2.2}
         rx={0.08}
         fill="rgba(26,34,44,0.03)"
         stroke="rgba(26,34,44,0.1)"
@@ -97,7 +97,7 @@ export function RinkSurface() {
         x={SIDE_LINE + 0.35}
         y={-1.6}
         width={2.1}
-        height={8 * 1.25}
+        height={8 * 1.25 + 2.2}
         rx={0.08}
         fill="rgba(26,34,44,0.03)"
         stroke="rgba(26,34,44,0.1)"

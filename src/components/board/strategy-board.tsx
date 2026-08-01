@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useState } from "react";
-import { createInitialRocks, type Rock } from "@/lib/rink";
+import { createInitialRocks, type Marker, type Rock } from "@/lib/rink";
 import { Board2D } from "@/components/board/board-2d";
 import {
   OptionsRail,
@@ -24,6 +24,7 @@ const Board3D = dynamic(
 
 export function StrategyBoard() {
   const [rocks, setRocks] = useState<Rock[]>(() => createInitialRocks());
+  const [markers, setMarkers] = useState<Marker[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mode, setMode] = useState<ViewMode>("2d");
   const [options, setOptions] = useState<BoardOptions>({
@@ -46,6 +47,8 @@ export function StrategyBoard() {
           <Board2D
             rocks={rocks}
             onRocksChange={setRocks}
+            markers={markers}
+            onMarkersChange={setMarkers}
             selectedId={selectedId}
             onSelect={setSelectedId}
             showGuardShades={options.showGuardShades}
@@ -56,6 +59,7 @@ export function StrategyBoard() {
           <>
             <Board3D
               rocks={rocks}
+              markers={markers}
               selectedId={selectedId}
               onSelect={setSelectedId}
               showGuardShades={options.showGuardShades}

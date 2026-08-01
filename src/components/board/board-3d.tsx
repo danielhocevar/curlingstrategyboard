@@ -26,9 +26,11 @@ import {
   STONE_DIAMETER,
   STONE_RADIUS,
   TEE_LINE_Y,
+  MARKER_RADIUS,
   VIEW_HEIGHT,
   VIEW_MIN_Y,
   VIEW_WIDTH,
+  type Marker,
   type Rock,
 } from "@/lib/rink";
 
@@ -516,8 +518,114 @@ function NumberedRock({
   );
 }
 
+const MARKER_OUTLINE = {
+  red: "#7a1f1f",
+  yellow: "#6e5314",
+} as const;
+
+function useMarkerLabelTexture(letter: string, outline: string) {
+  return useMemo(() => {
+    const size = 128;
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      ctx.clearRect(0, 0, size, size);
+      ctx.font = "800 86px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.lineJoin = "round";
+      ctx.miterLimit = 2;
+      ctx.strokeStyle = outline;
+      ctx.lineWidth = 14;
+      ctx.strokeText(letter, size / 2, size / 2);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(letter, size / 2, size / 2);
+    }
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.needsUpdate = true;
+    return tex;
+  }, [letter, outline]);
+}
+
+function Marker3D({
+  marker,
+  selected,
+  onSelect,
+}: {
+  marker: Marker;
+  selected: boolean;
+  onSelect: (id: string) => void;
+}) {
+  const color = TEAM_COLOR[marker.team];
+  const outline = MARKER_OUTLINE[marker.team];
+  const label = useMarkerLabelTexture(marker.letter, outline);
+  const r = MARKER_RADIUS;
+  const arm = r * 1.15;
+  const y = ICE_Y + 0.11;
+
+  return (
+    <group
+      position={[marker.x, 0, marker.y]}
+      onClick={(event) => {
+        event.stopPropagation();
+        onSelect(marker.id);
+      }}
+      onPointerOver={() => {
+        document.body.style.cursor = "pointer";
+      }}
+      onPointerOut={() => {
+        document.body.style.cursor = "default";
+      }}
+    >
+      {selected ? (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, y - 0.01, 0]}>
+          <ringGeometry args={[r + 0.08, r + 0.14, 48]} />
+          <meshBasicMaterial color="#3a6f9a" transparent opacity={0.85} />
+        </mesh>
+      ) : null}
+
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, y, 0]}>
+        <circleGeometry args={[r, 48]} />
+        <meshBasicMaterial
+          color={color}
+          transparent
+          opacity={0.32}
+          depthWrite={false}
+        />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, y + 0.002, 0]}>
+        <ringGeometry args={[r - 0.03, r, 48]} />
+        <meshBasicMaterial color={color} transparent opacity={0.75} />
+      </mesh>
+
+      <mesh position={[0, y + 0.004, 0]}>
+        <boxGeometry args={[0.05, 0.01, arm * 2]} />
+        <meshBasicMaterial color={color} />
+      </mesh>
+      <mesh position={[0, y + 0.004, 0]}>
+        <boxGeometry args={[arm * 2, 0.01, 0.05]} />
+        <meshBasicMaterial color={color} />
+      </mesh>
+
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, y + 0.02, 0]}>
+        <planeGeometry args={[r * 1.35, r * 1.35]} />
+        <meshBasicMaterial
+          map={label}
+          transparent
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </mesh>
+    </group>
+  );
+}
+
 type Board3DProps = {
   rocks: Rock[];
+  markers: Marker[];
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   showGuardShades?: boolean;
@@ -527,6 +635,7 @@ type Board3DProps = {
 
 export function Board3D({
   rocks,
+  markers,
   selectedId,
   onSelect,
   showGuardShades = false,
@@ -590,6 +699,14 @@ export function Board3D({
         <Rink3D />
         {showGuardZones ? <GuardZones3D /> : null}
         {showGuardShades ? <GuardLanes3D rocks={rocks} /> : null}
+        {markers.map((marker) => (
+          <Marker3D
+            key={marker.id}
+            marker={marker}
+            selected={marker.id === selectedId}
+            onSelect={onSelect}
+          />
+        ))}
         {rocks.map((rock) => (
           <NumberedRock
             key={rock.id}

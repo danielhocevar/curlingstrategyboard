@@ -2,9 +2,16 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  clampMarkerPosition,
   clampRockPosition,
+  createMarker,
+  isOnSheet,
+  markerPalettePosition,
+  nextMarkerLetter,
   rackPosition,
+  type Marker,
   type Rock,
+  type Team,
   VIEW_HEIGHT,
   VIEW_MIN_X,
   VIEW_MIN_Y,
@@ -12,10 +19,14 @@ import {
 } from "@/lib/rink";
 import { GuardShades } from "@/components/board/guard-shades";
 import { GuardZones } from "@/components/board/guard-zones";
+import { MarkerPalette, MarkerPiece } from "@/components/board/marker";
 import { RinkSurface } from "@/components/board/rink-surface";
 import { Rock as RockPiece, RockDefs } from "@/components/board/rock";
 
+type DragKind = "rock" | "marker";
+
 type DragState = {
+  kind: DragKind;
   id: string;
   pointerId: number;
   offsetX: number;
@@ -39,6 +50,10 @@ function clientToSvg(
 type Board2DProps = {
   rocks: Rock[];
   onRocksChange: (rocks: Rock[] | ((prev: Rock[]) => Rock[])) => void;
+  markers: Marker[];
+  onMarkersChange: (
+    markers: Marker[] | ((prev: Marker[]) => Marker[]),
+  ) => void;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   showGuardShades?: boolean;
@@ -49,6 +64,8 @@ type Board2DProps = {
 export function Board2D({
   rocks,
   onRocksChange,
+  markers,
+  onMarkersChange,
   selectedId,
   onSelect,
   showGuardShades = false,
@@ -57,6 +74,8 @@ export function Board2D({
 }: Board2DProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
+  const markersRef = useRef(markers);
+  markersRef.current = markers;
 
   const returnToRack = useCallback(
     (id: string) => {
@@ -81,6 +100,7 @@ export function Board2D({
       const point = clientToSvg(svg, event.clientX, event.clientY);
       onSelect(rock.id);
       setDrag({
+        kind: "rock",
         id: rock.id,
         pointerId: event.pointerId,
         offsetX: rock.x - point.x,
@@ -88,6 +108,51 @@ export function Board2D({
       });
     },
     [onSelect],
+  );
+
+  const onMarkerPointerDown = useCallback(
+    (marker: Marker, event: React.PointerEvent<SVGGElement>) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const svg = svgRef.current;
+      if (!svg) return;
+
+      const point = clientToSvg(svg, event.clientX, event.clientY);
+      onSelect(marker.id);
+      setDrag({
+        kind: "marker",
+        id: marker.id,
+        pointerId: event.pointerId,
+        offsetX: marker.x - point.x,
+        offsetY: marker.y - point.y,
+      });
+    },
+    [onSelect],
+  );
+
+  const onPalettePointerDown = useCallback(
+    (team: Team, event: React.PointerEvent<SVGGElement>) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const svg = svgRef.current;
+      if (!svg) return;
+
+      const point = clientToSvg(svg, event.clientX, event.clientY);
+      const palette = markerPalettePosition(team);
+      const letter = nextMarkerLetter(markersRef.current, team);
+      const marker = createMarker(team, letter, palette.x, palette.y);
+
+      onMarkersChange((prev) => [...prev, marker]);
+      onSelect(marker.id);
+      setDrag({
+        kind: "marker",
+        id: marker.id,
+        pointerId: event.pointerId,
+        offsetX: palette.x - point.x,
+        offsetY: palette.y - point.y,
+      });
+    },
+    [onSelect, onMarkersChange],
   );
 
   useEffect(() => {
@@ -99,20 +164,50 @@ export function Board2D({
       if (!svg) return;
 
       const point = clientToSvg(svg, event.clientX, event.clientY);
-      const next = clampRockPosition(
-        point.x + drag.offsetX,
-        point.y + drag.offsetY,
-      );
+      const rawX = point.x + drag.offsetX;
+      const rawY = point.y + drag.offsetY;
 
-      onRocksChange((prev) =>
-        prev.map((rock) =>
-          rock.id === drag.id ? { ...rock, x: next.x, y: next.y } : rock,
+      if (drag.kind === "rock") {
+        const next = clampRockPosition(rawX, rawY);
+        onRocksChange((prev) =>
+          prev.map((rock) =>
+            rock.id === drag.id ? { ...rock, x: next.x, y: next.y } : rock,
+          ),
+        );
+        return;
+      }
+
+      const next = clampMarkerPosition(rawX, rawY);
+      onMarkersChange((prev) =>
+        prev.map((marker) =>
+          marker.id === drag.id ? { ...marker, x: next.x, y: next.y } : marker,
         ),
       );
     };
 
     const endDrag = (event: PointerEvent) => {
       if (event.pointerId !== drag.pointerId) return;
+
+      if (drag.kind === "rock") {
+        onRocksChange((prev) =>
+          prev.map((rock) => {
+            if (rock.id !== drag.id) return rock;
+            if (isOnSheet(rock.x, rock.y)) return rock;
+            const pos = rackPosition(rock.team, rock.number);
+            return { ...rock, ...pos };
+          }),
+        );
+      } else {
+        onMarkersChange((prev) =>
+          prev.map((marker) => {
+            if (marker.id !== drag.id) return marker;
+            if (isOnSheet(marker.x, marker.y)) return marker;
+            const pos = markerPalettePosition(marker.team);
+            return { ...marker, ...pos };
+          }),
+        );
+      }
+
       setDrag(null);
     };
 
@@ -124,7 +219,7 @@ export function Board2D({
       window.removeEventListener("pointerup", endDrag);
       window.removeEventListener("pointercancel", endDrag);
     };
-  }, [drag, onRocksChange]);
+  }, [drag, onRocksChange, onMarkersChange]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -137,12 +232,20 @@ export function Board2D({
         selectedId
       ) {
         event.preventDefault();
+        if (selectedId.startsWith("marker-")) {
+          onMarkersChange((prev) => prev.filter((m) => m.id !== selectedId));
+          onSelect(null);
+          return;
+        }
         returnToRack(selectedId);
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onSelect, returnToRack, selectedId]);
+  }, [onSelect, onMarkersChange, returnToRack, selectedId]);
+
+  const redPalette = markerPalettePosition("red");
+  const yellowPalette = markerPalettePosition("yellow");
 
   return (
     <div className="flex h-full w-full items-center justify-center p-3 sm:p-5 lg:p-8">
@@ -161,6 +264,38 @@ export function Board2D({
         <RinkSurface />
         {showGuardZones ? <GuardZones /> : null}
         {showGuardShades ? <GuardShades rocks={rocks} /> : null}
+
+        <MarkerPalette
+          team="red"
+          x={redPalette.x}
+          y={redPalette.y}
+          onPointerDown={(event) => onPalettePointerDown("red", event)}
+        />
+        <MarkerPalette
+          team="yellow"
+          x={yellowPalette.x}
+          y={yellowPalette.y}
+          onPointerDown={(event) => onPalettePointerDown("yellow", event)}
+        />
+
+        {[...markers]
+          .sort((a, b) => {
+            if (a.id === drag?.id) return 1;
+            if (b.id === drag?.id) return -1;
+            if (a.id === selectedId) return 1;
+            if (b.id === selectedId) return -1;
+            return 0;
+          })
+          .map((marker) => (
+            <MarkerPiece
+              key={marker.id}
+              marker={marker}
+              selected={marker.id === selectedId}
+              dragging={marker.id === drag?.id}
+              onPointerDown={(event) => onMarkerPointerDown(marker, event)}
+            />
+          ))}
+
         {[...rocks]
           .sort((a, b) => {
             if (a.id === drag?.id) return 1;

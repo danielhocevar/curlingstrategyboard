@@ -45,11 +45,62 @@ export type Rock = {
   y: number;
 };
 
+export type Marker = {
+  id: string;
+  team: Team;
+  letter: string;
+  x: number;
+  y: number;
+};
+
+export const MARKER_RADIUS = STONE_RADIUS;
+
 export function rackPosition(team: Team, number: number): { x: number; y: number } {
   const col = team === "red" ? -(SIDE_LINE + RACK_GUTTER * 0.55) : SIDE_LINE + RACK_GUTTER * 0.55;
   const startY = -1.2;
   const gap = STONE_DIAMETER + 0.28;
   return { x: col, y: startY + (number - 1) * gap };
+}
+
+/** Infinite source for team markers, below the rock rack. */
+export function markerPalettePosition(team: Team): { x: number; y: number } {
+  const rock8 = rackPosition(team, 8);
+  return { x: rock8.x, y: rock8.y + STONE_DIAMETER + 0.7 };
+}
+
+/** 0 → A, 25 → Z, 26 → AA */
+export function indexToLetter(index: number): string {
+  let n = index;
+  let s = "";
+  do {
+    s = String.fromCharCode(65 + (n % 26)) + s;
+    n = Math.floor(n / 26) - 1;
+  } while (n >= 0);
+  return s;
+}
+
+export function nextMarkerLetter(markers: Marker[], team: Team): string {
+  const used = new Set(
+    markers.filter((m) => m.team === team).map((m) => m.letter),
+  );
+  let i = 0;
+  while (used.has(indexToLetter(i))) i += 1;
+  return indexToLetter(i);
+}
+
+export function createMarker(
+  team: Team,
+  letter: string,
+  x: number,
+  y: number,
+): Marker {
+  return {
+    id: `marker-${team}-${letter}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    team,
+    letter,
+    x,
+    y,
+  };
 }
 
 export function createInitialRocks(): Rock[] {
@@ -69,6 +120,23 @@ export function clampRockPosition(x: number, y: number): { x: number; y: number 
     x: Math.min(VIEW_MAX_X - pad, Math.max(VIEW_MIN_X + pad, x)),
     y: Math.min(VIEW_MAX_Y - pad, Math.max(VIEW_MIN_Y + pad, y)),
   };
+}
+
+export function clampMarkerPosition(x: number, y: number): { x: number; y: number } {
+  const pad = MARKER_RADIUS + 0.05;
+  return {
+    x: Math.min(VIEW_MAX_X - pad, Math.max(VIEW_MIN_X + pad, x)),
+    y: Math.min(VIEW_MAX_Y - pad, Math.max(VIEW_MIN_Y + pad, y)),
+  };
+}
+
+/** True when the piece is on the ice between the sidelines. */
+export function isOnSheet(x: number, y: number): boolean {
+  return (
+    Math.abs(x) <= SIDE_LINE &&
+    y >= VIEW_MIN_Y &&
+    y <= VIEW_MAX_Y
+  );
 }
 
 export function formatFeet(value: number): string {
