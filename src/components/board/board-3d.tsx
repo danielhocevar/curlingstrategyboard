@@ -21,6 +21,7 @@ import {
   LOGO_CAPTION,
   LOGO_SIZE,
   LOGO_Y,
+  RACK_GUTTER,
   RING_4_RADIUS,
   RING_8_RADIUS,
   SIDE_LINE,
@@ -400,6 +401,73 @@ function ThLogo3D() {
   );
 }
 
+function useSideUrlTexture(text: string) {
+  return useMemo(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1600;
+    canvas.height = 200;
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#1a222c";
+      ctx.font = "700 120px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, canvas.width / 2, canvas.height / 2 + 4);
+    }
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.needsUpdate = true;
+    return tex;
+  }, [text]);
+}
+
+function ApronSideText3D() {
+  const texture = useSideUrlTexture("curlingstrategyboard.com");
+  const sheetCenterZ = VIEW_MIN_Y + VIEW_HEIGHT / 2;
+  const textLength = 22;
+  const textHeight = 1.55;
+  // Past the rock racks, on the grey apron beside the ice.
+  const x = SIDE_LINE + RACK_GUTTER + 1.15;
+  const y = ICE_Y - 0.02;
+
+  return (
+    <group>
+      {/* Left / right — larger, facing outward away from the ice */}
+      <mesh
+        rotation={[-Math.PI / 2, 0, -Math.PI / 2]}
+        position={[-x, y, sheetCenterZ]}
+        renderOrder={1}
+      >
+        <planeGeometry args={[textLength, textHeight]} />
+        <meshBasicMaterial
+          map={texture}
+          transparent
+          opacity={0.34}
+          depthWrite={false}
+          toneMapped={false}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+      <mesh
+        rotation={[-Math.PI / 2, 0, Math.PI / 2]}
+        position={[x, y, sheetCenterZ]}
+        renderOrder={1}
+      >
+        <planeGeometry args={[textLength, textHeight]} />
+        <meshBasicMaterial
+          map={texture}
+          transparent
+          opacity={0.34}
+          depthWrite={false}
+          toneMapped={false}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+    </group>
+  );
+}
+
 function Rink3D() {
   const sheetCenterZ = VIEW_MIN_Y + VIEW_HEIGHT / 2;
 
@@ -414,6 +482,8 @@ function Rink3D() {
         <planeGeometry args={[VIEW_WIDTH + 10, VIEW_HEIGHT + 10]} />
         <meshStandardMaterial color="#94a3b8" roughness={0.95} />
       </mesh>
+
+      <ApronSideText3D />
 
       {/* Ice sheet with clearcoat sheen */}
       <mesh
