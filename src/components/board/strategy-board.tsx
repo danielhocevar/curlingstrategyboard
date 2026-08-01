@@ -27,69 +27,89 @@ const Board3D = dynamic(
 
 const SIDEBAR_ID = "options-sidebar";
 
+function useIsDesktop() {
+  const [isDesktop, setIsDesktop] = useState(true);
+
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 1024px)");
+    const update = () => setIsDesktop(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+
+  return isDesktop;
+}
+
 export function StrategyBoard() {
+  const isDesktop = useIsDesktop();
   const [rocks, setRocks] = useState<Rock[]>(() => createInitialRocks());
   const [markers, setMarkers] = useState<Marker[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mode, setMode] = useState<ViewMode>("2d");
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [options, setOptions] = useState<BoardOptions>({
     showGuardShades: false,
     neonRing: false,
     showGuardZones: false,
   });
 
+  const sidebarOpen = isDesktop || mobileSidebarOpen;
+
   useEffect(() => {
-    if (!sidebarOpen) return;
+    if (isDesktop || !mobileSidebarOpen) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setSidebarOpen(false);
+      if (event.key === "Escape") setMobileSidebarOpen(false);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [sidebarOpen]);
+  }, [isDesktop, mobileSidebarOpen]);
 
   return (
-    <div className="relative h-[100dvh] overflow-hidden bg-background">
-      <Button
-        type="button"
-        variant="outline"
-        size="icon-lg"
-        className="absolute top-3 left-3 z-50 rounded-sm border-border bg-background/95 shadow-sm backdrop-blur-sm"
-        aria-expanded={sidebarOpen}
-        aria-controls={SIDEBAR_ID}
-        onClick={() => setSidebarOpen((open) => !open)}
-      >
-        {sidebarOpen ? (
-          <X weight="bold" className="size-5" aria-hidden />
-        ) : (
-          <List weight="bold" className="size-5" aria-hidden />
-        )}
-        <span className="sr-only">
-          {sidebarOpen ? "Close menu" : "Open menu"}
-        </span>
-      </Button>
+    <div className="flex h-[100dvh] overflow-hidden bg-background">
+      {!isDesktop ? (
+        <Button
+          type="button"
+          variant="outline"
+          size="icon-lg"
+          className="absolute top-3 left-3 z-50 rounded-sm border-border bg-background/95 shadow-sm backdrop-blur-sm lg:hidden"
+          aria-expanded={mobileSidebarOpen}
+          aria-controls={SIDEBAR_ID}
+          onClick={() => setMobileSidebarOpen((open) => !open)}
+        >
+          {mobileSidebarOpen ? (
+            <X weight="bold" className="size-5" aria-hidden />
+          ) : (
+            <List weight="bold" className="size-5" aria-hidden />
+          )}
+          <span className="sr-only">
+            {mobileSidebarOpen ? "Close menu" : "Open menu"}
+          </span>
+        </Button>
+      ) : null}
 
       <div
         className={cn(
-          "absolute inset-0 z-40 bg-black/25 transition-opacity duration-200 lg:bg-black/10",
-          sidebarOpen
+          "absolute inset-0 z-40 bg-black/25 transition-opacity duration-200 lg:hidden",
+          mobileSidebarOpen
             ? "opacity-100"
             : "pointer-events-none opacity-0",
         )}
-        aria-hidden={!sidebarOpen}
-        onClick={() => setSidebarOpen(false)}
+        aria-hidden={!mobileSidebarOpen}
+        onClick={() => setMobileSidebarOpen(false)}
       />
 
       <OptionsRail
         id={SIDEBAR_ID}
         open={sidebarOpen}
+        collapsible={!isDesktop}
         options={options}
         onChange={setOptions}
         mode={mode}
         onModeChange={setMode}
       />
 
-      <main className="relative h-full min-h-0 min-w-0 overflow-hidden">
+      <main className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
         {mode === "2d" ? (
           <Board2D
             rocks={rocks}

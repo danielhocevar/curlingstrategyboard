@@ -17,6 +17,8 @@ export type ViewMode = "2d" | "3d";
 type OptionsRailProps = {
   id: string;
   open: boolean;
+  /** When false, sidebar is always visible (desktop). */
+  collapsible?: boolean;
   options: BoardOptions;
   onChange: (next: BoardOptions) => void;
   mode: ViewMode;
@@ -28,23 +30,33 @@ const VIEW_MODES: ViewMode[] = ["2d", "3d"];
 export function OptionsRail({
   id,
   open,
+  collapsible = true,
   options,
   onChange,
   mode,
   onModeChange,
 }: OptionsRailProps) {
+  const interactive = open || !collapsible;
+
   return (
     <aside
       id={id}
       aria-label="Strategy board menu"
-      aria-hidden={!open}
-      inert={!open ? true : undefined}
+      aria-hidden={!interactive}
+      inert={!interactive ? true : undefined}
       className={cn(
-        "absolute inset-y-0 left-0 z-40 flex w-[min(100%,240px)] flex-col border-r border-border bg-card shadow-lg transition-transform duration-200 ease-out",
-        open ? "translate-x-0" : "-translate-x-full",
+        "flex h-full w-[min(100%,240px)] shrink-0 flex-col border-r border-border bg-card",
+        "fixed inset-y-0 left-0 z-40 shadow-lg transition-transform duration-200 ease-out",
+        "lg:static lg:z-0 lg:translate-x-0 lg:shadow-none lg:transition-none",
+        open ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
       )}
     >
-      <div className="border-b border-border py-4 pr-4 pl-14">
+      <div
+        className={cn(
+          "border-b border-border py-4 pr-4",
+          collapsible ? "pl-14 lg:px-4" : "px-4",
+        )}
+      >
         <div className="text-sport pb-0.5 text-[34px] leading-[1.05] text-foreground">
           Curling
         </div>
@@ -76,7 +88,7 @@ export function OptionsRail({
                     : "text-muted-foreground hover:text-foreground",
                 )}
                 aria-pressed={active}
-                tabIndex={open ? 0 : -1}
+                tabIndex={interactive ? 0 : -1}
               >
                 {value.toUpperCase()}
               </button>
@@ -111,7 +123,7 @@ export function OptionsRail({
               onChange({ ...options, showGuardShades: checked })
             }
             className="mt-0.5 shrink-0"
-            tabIndex={open ? 0 : -1}
+            tabIndex={interactive ? 0 : -1}
           />
         </div>
 
@@ -134,7 +146,7 @@ export function OptionsRail({
               onChange({ ...options, showGuardZones: checked })
             }
             className="mt-0.5 shrink-0"
-            tabIndex={open ? 0 : -1}
+            tabIndex={interactive ? 0 : -1}
           />
         </div>
 
@@ -157,7 +169,7 @@ export function OptionsRail({
               onChange({ ...options, neonRing: checked })
             }
             className="mt-0.5 shrink-0"
-            tabIndex={open ? 0 : -1}
+            tabIndex={interactive ? 0 : -1}
           />
         </div>
       </div>
@@ -167,7 +179,7 @@ export function OptionsRail({
           href="https://www.instagram.com/teamhocevar/"
           target="_blank"
           rel="noopener noreferrer"
-          tabIndex={open ? 0 : -1}
+          tabIndex={interactive ? 0 : -1}
           className="flex items-center gap-3 rounded-sm outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring"
         >
           <Image
