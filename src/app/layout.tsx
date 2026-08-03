@@ -62,7 +62,7 @@ export const metadata: Metadata = {
     locale: "en_CA",
     url: "/",
     siteName: title,
-    title: `${title} | Team Hocevar`,
+    title,
     description,
     images: [
       {
@@ -75,7 +75,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: `${title} | Team Hocevar`,
+    title,
     description,
     images: ["/preview.png"],
   },
